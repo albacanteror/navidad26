@@ -37,10 +37,13 @@ export class WiseMan extends SurfaceEntity {
     const fadeIn = easings.easeOutCubic(Math.min(1, this.age / A.fadeInSeconds));
     const fadeOut = this.mode === 'fading' ? 1 - Math.min(1, this.fadeT / this.W.fadeSeconds) : 1;
     const pulse = 1 - A.pulse * 0.5 * (1 + Math.sin(this.age * A.pulseSpeed * Math.PI * 2));
+    // much brighter when the player is far (same distance curve as the beams, eased)
+    const far = this.beam.far;
+    const boost = 1 + ((A.farBoost ?? 1) - 1) * far;
     return {
       pos: this.worldPos(A.height),
       color: this.auraColor,
-      strength: A.strength * fadeIn * fadeOut * pulse,
+      strength: A.strength * fadeIn * fadeOut * pulse * boost,
       radius: A.radius,
     };
   }
@@ -74,7 +77,9 @@ export class WiseMan extends SurfaceEntity {
     }
     this.anim.update(dt);
     this.updateModel();
-    this.beam.update(dt, this.mode === 'fading' ? 1 - Math.min(1, this.fadeT / this.W.fadeSeconds) : 1);
+    // the beam leans toward / grows for a far player (beams.far*)
+    this.beam.update(dt, this.mode === 'fading' ? 1 - Math.min(1, this.fadeT / this.W.fadeSeconds) : 1,
+      g.player.dir, this.distanceTo(g.player.dir));
   }
 
   startMagic() {
