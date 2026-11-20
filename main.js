@@ -102,11 +102,13 @@ function frame(now) {
   frame.prev = now;
   if (statT > 0.5) {
     fps = frames / statT;
+    // adaptive stroke cap (render.targetFps); skip windows with a long pause (hidden tab)
+    if (mode === 'play' && statT < 2 && !document.hidden) renderer.strokes.adapt(fps);
     frames = 0;
     statT = 0;
     if (S.debug.showStats && game) {
       const st = renderer.stats;
-      statsEl.textContent = `${fps.toFixed(0)} fps · strokes ${st.strokes}/${st.candidates} · enemies ${game.enemies.length} · trees hidden ${st.treesHidden || 0} · t ${game.playTime.toFixed(0)}s · seed ${game.seed}`;
+      statsEl.textContent = `${fps.toFixed(0)} fps · strokes ${st.strokes}/${st.candidates} (cap ${renderer.strokes.cap}) · enemies ${game.enemies.length} · trees hidden ${st.treesHidden || 0} · t ${game.playTime.toFixed(0)}s · seed ${game.seed}`;
     }
     statsEl.classList.toggle('hidden', !S.debug.showStats);
   }

@@ -6,8 +6,13 @@ html, body {
   background: #0d1d45;
   font-family: Georgia, 'Times New Roman', serif;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* long press (dialog: back) opens no menu on phones */
+  touch-action: manipulation;    /* no double-tap zoom delay */
 }
 canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+/* touch: the game handles fingers itself (walk + orbit), no browser pan / zoom */
+canvas#game, #dialog, #lockHint, #hud { touch-action: none; }
 .hidden { display: none !important; }
 
 /* ---------------- HUD */

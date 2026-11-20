@@ -184,6 +184,10 @@ const settings = {
    * ------------------------------------------------------------------------ */
   render: {
     maxStrokes: 256000,             // stroke cap: the farthest strokes are dropped first
+    // ADAPTIVE CAP: while the frame rate is below targetFps the cap goes down
+    // (never below minStrokes); when there is room again it climbs back to maxStrokes.
+    minStrokes: 25600,
+    targetFps: 30,
     maxDistance: 4000,               // vertices farther than this from the camera are never drawn
     pixelRatioMax: 1.5,            // cap on devicePixelRatio (performance) 1
     fovY: 62,                      // vertical field of view (degrees)
@@ -454,6 +458,11 @@ const settings = {
     maxPitch: 72,                  // pitch with the cursor at the bottom (degrees)
     invertY: false,
     easeSeconds: 0.25,             // ease-out-cubic time for the camera to follow the mouse
+    // TOUCH SCREENS: holding a finger walks forward, moving it orbits the camera
+    // (both at once). A touch that STARTS in the lower touchBackZone walks backward.
+    // In dialogs a tap is always "next" (long press = one page back).
+    touchSpeed: 1.0,               // orbit speed of a moving finger (1 = like the mouse)
+    touchBackZone: 0.27,           // lower fraction of the screen where a touch walks backward
     groundClearance: 0.9,          // keep the camera this far above the terrain
                                    // (the ground is never clipped by the camera, whatever render.near is)
   },
@@ -885,6 +894,9 @@ const settings = {
    * ------------------------------------------------------------------------ */
   dialog: {
     charsPerSecond: 42,            // typewriter speed
+    // click / tap / Space = next page. Right click / Backspace / long press = one page
+    // back (down to the first page). A dialog only closes by reaching its end.
+    longPressMs: 450,              // touch screens: hold this long (finger still) to go back
     // no background color: while the dialog is open, no stroke is painted below an
     // arc that joins the two bottom corners of the screen. The arc is only as high
     // as the text box needs (its top corners + arcMargin): on bigger screens it is
@@ -990,6 +1002,7 @@ const settings = {
     title: '',                     // optional title on the welcome page (empty = only the button)
     start: 'Comenzar',
     controlsHint: 'clic para moverte e interactuar · mueve el ratón para girar la cámara',
+    controlsHintTouch: 'mantén el dedo para avanzar (abajo: retroceder) · deslízalo para girar la cámara', // touch screens
     dialogHint: 'clic',
     gameOverTitle: 'La nieve te ha vencido...',
     gameOverPoints: 'tu espíritu navideño está al {points}%.',
