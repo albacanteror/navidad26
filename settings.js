@@ -1012,7 +1012,7 @@ const settings = {
     title: '',                     // optional title on the welcome page (empty = only the button)
     start: 'Comenzar',
     controlsHint: 'clic para moverte e interactuar · mueve el ratón para girar la cámara',
-    controlsHintTouch: 'mantén el dedo para avanzar (abajo: retroceder) · deslízalo para girar la cámara', // touch screens
+    controlsHintTouch: 'mantén el dedo para avanzar y girar. En el ordenador esto es mejor u.u', // touch screens
     dialogHint: 'clic',
     gameOverTitle: 'La nieve te ha vencido...',
     gameOverPoints: 'tu espíritu navideño está al {points}%.',
