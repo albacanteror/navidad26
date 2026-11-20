@@ -222,10 +222,11 @@ const settings = {
 
     maxPointLights: 20,            // point lights (auras, flashes) applied at once; the most relevant
                                    // (strong, wide, close to the player) are kept. Higher = slower.
-    // GLOBAL CONTRAST: dark colors darker and bright colors brighter (strokes +
-    // background). 1 = off, 1.3 = punchy, <1 = flatter. Black and white stay put.
-    contrast: 1.01,
-    contrastPivot: 0.5,            // colors below this get darker, above it brighter (0..1)
+    // GLOBAL TONE (strokes + background). Two separate balances around the pivot;
+    // pure black, the pivot and pure white always stay put. 1 = no change.
+    darkBalance: 0.75,             // colors BELOW the pivot: < 1 = lighter darks, > 1 = deeper darks
+    lightBalance: 1.0,             // colors ABOVE the pivot: > 1 = brighter brights, < 1 = dimmer brights
+    contrastPivot: 0.5,            // where darks end and brights begin (0..1)
     fogNear: 22,                   // fog starts (world units from camera)
     fogFar: 500,                    // fully fogged (= background color)
   },
@@ -612,6 +613,7 @@ const settings = {
       pulse: 0.5,                  // 0..1 slow breathing of the strength
       pulseSpeed: 1.3,             // pulses per second
       fadeInSeconds: 1.2,          // the aura eases in when he appears (it fades out with him)
+      farBoost: 4,                 // strength multiplier when the player is far (beams.farStart .. farEnd)
     },
     beam: {},                      // overrides of `beams` for the wise men's beams (e.g. { color: '#ffffff' })
     // one entry per wise man, in order. Colors map to the model's material roles.
@@ -681,6 +683,14 @@ const settings = {
     minRadius: 0.2,                // bottom radius at the start of each pulse
     dimStart: 0.7,                 // fraction of `radius` where the alpha starts to dim
     count: 3,                      // beams alive at once (each one costs its strokes)
+    // FAR PLAYER: so the beam can be seen from far away. Closer than farStart the
+    // beam is straight and normal size; from farStart to farEnd (smoothly) it
+    // leans toward the player (pivoting at its foot) and gets wider and longer.
+    farStart: 15,                  // world units (distance on the ground to the player)
+    farEnd: 50,                    // full effect from here on
+    farTilt: 50,                   // degrees the beam leans toward the player at farEnd
+    farRadiusScale: 2.5,           // radius multiplier at farEnd
+    farLengthScale: 3,           // length multiplier at farEnd
   },
 
   /* --------------------------------------------------------------------------
