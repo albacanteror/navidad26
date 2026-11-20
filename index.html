@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Noche de Reyes</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- spirit bar on top, life bar at the very bottom -->
+  <div id="hud" class="hidden">
+    <div class="track"><div class="fill" id="pointsFill"></div></div>
+    <div class="track"><div class="fill" id="lifeFill"></div></div>
+  </div>
+
+  <div id="lockHint" class="hidden"></div>
+
+  <div id="dialog" class="hidden">
+    <div id="dialogName"></div>
+    <div id="dialogText"></div>
+    <div id="dialogHint"></div>
+  </div>
+
+  <div id="overlay" class="hidden"></div>
+
+  <div id="endScreen" class="hidden">
+    <div id="endTitle"></div>
+    <div id="endText"></div>
+    <div id="winLines" class="hidden"></div>
+    <canvas id="calendar" class="hidden"></canvas>
+    <!-- win screen: side by side, as wide as the calendar -->
+    <div id="endButtons">
+      <button id="retry"></button>
+      <button id="send" class="hidden"></button>
+    </div>
+  </div>
+
+  <div id="welcome">
+    <div id="title"></div>
+    <button id="start"></button>
+    <div id="controlsHint"></div>
+  </div>
+
+  <div id="stats" class="hidden"></div>
+  <pre id="error" class="hidden"></pre>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
