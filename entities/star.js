@@ -73,6 +73,7 @@ export class Star {
     const p = scale(up, this.game.planet.heightAt(up) + T.height + bob);
     this.pos = p;
     this.instance.applyTransform(fromBasis(X, up, Z, p, T.scale), T.scale);
-    this.beam.update(dt, 1);
+    // the beam leans toward / grows for a far player (beams.far*)
+    this.beam.update(dt, 1, this.game.player.dir, this.distanceToPlayer());
   }
 }
