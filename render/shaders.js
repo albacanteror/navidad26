@@ -93,14 +93,15 @@ float linDepth(float d, vec2 nf){
 }
 float hash(float n){ return fract(sin(n) * 43758.5453123); }
 
-uniform vec2 uContrast;         // amount (1 = off), pivot
-// Contrast S-curve that keeps 0 and 1 fixed: below the pivot values are pushed
-// down, above it pushed up. Values above 1 (glows) are left as they are.
+uniform vec3 uContrast;         // dark balance, light balance (1 = off), pivot
+// Tone curve that keeps 0, the pivot and 1 fixed. Below the pivot: dark balance
+// > 1 = darker darks, < 1 = lighter darks. Above it: light balance > 1 = brighter
+// brights, < 1 = dimmer brights. Values above 1 (glows) are left as they are.
 vec3 contrastCurve(vec3 c){
-  float k = uContrast.x, p = uContrast.y;
-  if (abs(k - 1.0) < 1e-4) return c;
-  vec3 lo = p * pow(clamp(c / p, 0.0, 1.0), vec3(k));
-  vec3 hi = 1.0 - (1.0 - p) * pow(clamp((1.0 - c) / (1.0 - p), 0.0, 1.0), vec3(k));
+  float kd = uContrast.x, kl = uContrast.y, p = uContrast.z;
+  if (abs(kd - 1.0) < 1e-4 && abs(kl - 1.0) < 1e-4) return c;
+  vec3 lo = p * pow(clamp(c / p, 0.0, 1.0), vec3(kd));
+  vec3 hi = 1.0 - (1.0 - p) * pow(clamp((1.0 - c) / (1.0 - p), 0.0, 1.0), vec3(kl));
   vec3 r = mix(lo, hi, step(vec3(p), c));
   return mix(r, c, step(vec3(1.0), c));
 }
@@ -167,7 +168,7 @@ void main(){
   float f = smoothstep(uFog.x, uFog.y, clip.w) * iMisc.w;
   col = mix(col, uFogColor, f);
 
-  // ---- global contrast: darks darker, brights brighter (render.contrast)
+  // ---- global tone: render.darkBalance / lightBalance around render.contrastPivot
   col = contrastCurve(col);
 
   // ---- size: perspective, plus further vertices render smaller strokes

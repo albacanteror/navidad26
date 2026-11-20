@@ -9,13 +9,13 @@ import { Occlusion } from './occlusion.js';
 import { makeBrushAtlas } from './brush.js';
 import { perspective, lookAt, multiply, normalize, sub, cross, add, DEG, hexToRgb } from '../core/math.js';
 
-/** Same contrast curve as contrastCurve() in the stroke shader (for the background). */
-function contrastRgb(c, k, p) {
-  if (Math.abs(k - 1) < 1e-4) return c;
+/** Same tone curve as contrastCurve() in the stroke shader (for the background). */
+function contrastRgb(c, kd, kl, p) {
+  if (Math.abs(kd - 1) < 1e-4 && Math.abs(kl - 1) < 1e-4) return c;
   return c.map((v) => {
     if (v >= 1) return v;
-    if (v < p) return p * Math.pow(Math.max(0, v / p), k);
-    return 1 - (1 - p) * Math.pow(Math.max(0, (1 - v) / (1 - p)), k);
+    if (v < p) return p * Math.pow(Math.max(0, v / p), kd);
+    return 1 - (1 - p) * Math.pow(Math.max(0, (1 - v) / (1 - p)), kl);
   });
 }
 
@@ -118,7 +118,7 @@ export class Renderer {
     this.stats.candidates = this.strokes.candidates;
 
     // ---- draw
-    this.clear(contrastRgb(f.background, R.contrast ?? 1, R.contrastPivot ?? 0.5));
+    this.clear(contrastRgb(f.background, R.darkBalance ?? 1, R.lightBalance ?? 1, R.contrastPivot ?? 0.5));
     if (S.debug.showOcclusionGeometry) this.occlusion.drawDebug(viewProj, w, h);
     gl.disable(gl.DEPTH_TEST);
     gl.depthMask(false);
@@ -164,7 +164,7 @@ export class Renderer {
       gl.uniform1f(u.uDiffuse, L.diffuse);
 
       gl.uniform3fv(u.uFogColor, f.background);
-      gl.uniform2f(u.uContrast, R.contrast ?? 1, R.contrastPivot ?? 0.5);
+      gl.uniform3f(u.uContrast, R.darkBalance ?? 1, R.lightBalance ?? 1, R.contrastPivot ?? 0.5);
       gl.uniform2f(u.uFog, R.fogNear, R.fogFar);
 
       gl.uniform4f(u.uSize, R.strokeMinPx * dpr, R.strokeMaxPx * dpr, R.strokeAspect, R.strokeAspectJitter);
