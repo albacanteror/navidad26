@@ -13,6 +13,27 @@ import { StrokeSource } from '../render/strokes.js';
 import { anyPerpendicular, cross, normalize, hexToRgb } from '../core/math.js';
 import { easings } from '../core/easing.js';
 
+/**
+ * 0..1: how "far" the player is for the beams / auras: 0 closer than
+ * cfg.farStart, 1 at cfg.farEnd or further (smooth in between).
+ */
+export function farFactor(cfg, dist) {
+  const a = cfg.farStart ?? 15, b = Math.max(a + 1e-3, cfg.farEnd ?? 50);
+  const t = Math.min(1, Math.max(0, (dist - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Rotate v around the unit axis w by angle (Rodrigues). */
+function rotate(v, w, ang) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const d = (v[0] * w[0] + v[1] * w[1] + v[2] * w[2]) * (1 - c);
+  return [
+    v[0] * c + (w[1] * v[2] - w[2] * v[1]) * s + w[0] * d,
+    v[1] * c + (w[2] * v[0] - w[0] * v[2]) * s + w[1] * d,
+    v[2] * c + (w[0] * v[1] - w[1] * v[0]) * s + w[2] * d,
+  ];
+}
+
 /** Per-vertex color with a bit of brightness variance. */
 function fillLook(src, cfg, rng) {
   const c = hexToRgb(cfg.color);
@@ -37,6 +58,7 @@ export class LightBeam {
    */
   constructor(cfg, dir, baseHeight, rng) {
     this.cfg = cfg;
+    this.dir = dir;
     // `count` beams alive at once, their pulses evenly offset in time
     const count = Math.max(1, (cfg.count ?? 1) | 0);
     this.layers = [];
@@ -44,19 +66,43 @@ export class LightBeam {
     this.sources = this.layers.map((l) => l.source);
     this.t = 0;
     this.phase = rng(); // different beams (wise men, star) do not pulse in sync
+    this.far = 0;       // eased 0..1 "player is far" amount
   }
 
   /**
    * k = 0..1 visibility of the owner (fades out with it).
+   * playerDir / dist: unit direction of the player from the planet center and
+   * its distance to the beam. FAR PLAYER (beyond cfg.farStart): the beam leans
+   * toward the player (up to cfg.farTilt degrees at cfg.farEnd) and gets wider
+   * (farRadiusScale) and longer (farLengthScale), so it stays visible.
    * PULSE (sawtooth, period = cfg.pulse seconds): every period a layer starts
    * thin (cfg.minRadius) at full alpha (cfg.alpha) and widens with ease-out
    * cubic to its full radius. Its alpha stays full until the radius reaches
    * cfg.dimStart x radius, then falls to 0 at the full radius. Then it restarts.
    */
-  update(dt, k = 1) {
+  update(dt, k = 1, playerDir = null, dist = 0) {
     const cfg = this.cfg;
     this.t += dt;
     const fadeIn = easings.easeOutCubic(Math.min(1, this.t / cfg.fadeInSeconds));
+    // ---- far player: tilt + size (eased so it never jumps)
+    const want = playerDir ? farFactor(cfg, dist) : 0;
+    this.far += (want - this.far) * (1 - Math.exp(-dt / 0.6));
+    const f = this.far, d = this.dir;
+    let towards = null;
+    if (playerDir) {
+      const pd = playerDir[0] * d[0] + playerDir[1] * d[1] + playerDir[2] * d[2];
+      const tx = playerDir[0] - d[0] * pd, ty = playerDir[1] - d[1] * pd, tz = playerDir[2] - d[2] * pd;
+      const tl = Math.hypot(tx, ty, tz);
+      if (tl > 1e-5) towards = [tx / tl, ty / tl, tz / tl]; // along the ground, toward the player
+    }
+    if (towards) this.towards = towards;
+    const tilt = this.towards ? f * (cfg.farTilt ?? 0) * Math.PI / 180 : 0;
+    const frame = {
+      axisRot: tilt > 1e-4 ? normalize(cross(d, this.towards)) : null, // rotation axis of the lean
+      tilt,
+      radiusScale: 1 + ((cfg.farRadiusScale ?? 1) - 1) * f,
+      lengthScale: 1 + ((cfg.farLengthScale ?? 1) - 1) * f,
+    };
     for (const L of this.layers) {
       let grow = 1, dim = 1;
       if (cfg.pulse > 0) {
@@ -68,7 +114,7 @@ export class LightBeam {
         const d0 = Math.min(0.999, cfg.dimStart ?? 0);
         dim = 1 - Math.min(1, Math.max(0, (grow - d0) / (1 - d0))); // full radius = alpha 0
       }
-      L.setRadius(grow);
+      L.place(grow, frame);
       L.source.alpha = cfg.alpha * fadeIn * k * dim;
     }
   }
@@ -82,50 +128,64 @@ class BeamLayer {
     const rings = Math.max(2, Math.ceil(cfg.height / cfg.ringStep));
     const n = seg * (rings + 1);
     const src = new StrokeSource(n);
-    const a = anyPerpendicular(dir);
-    const b = cross(dir, a);
+    this.dir = dir;
+    this.a = anyPerpendicular(dir);
+    this.b = cross(dir, this.a);
+    this.base = (baseHeight - cfg.startBelow);  // the beam starts here (distance from the planet center)
+    this.height = cfg.height;
+    this.maxR = Math.max(cfg.radius, cfg.topRadius);
     const spin = rng() * Math.PI * 2; // layers do not line their strokes up
-    // per vertex: point on the axis, unit radial direction and the full radius
-    // there (bottom radius -> topRadius), so the radius can be animated
-    this.axis = new Float32Array(n * 3);
-    this.radial = new Float32Array(n * 3);
+    // per vertex: distance along the axis, angle around it (cos, sin) and the full
+    // radius there (bottom radius -> topRadius): the beam can be resized and tilted
+    this.along = new Float32Array(n);
+    this.cs = new Float32Array(n * 2);
     this.fullR = new Float32Array(n);
     let i = 0;
     for (let k = 0; k <= rings; k++) {
       const u = k / rings;
-      const h = baseHeight - cfg.startBelow + cfg.height * u;
       const r = cfg.radius + (cfg.topRadius - cfg.radius) * u;
       for (let s = 0; s < seg; s++, i++) {
         // staggered rings + a little jitter so strokes do not line up
         const th = spin + ((s + (k % 2) * 0.5 + (rng() - 0.5) * 0.4) / seg) * Math.PI * 2;
-        const ox = Math.cos(th), oy = Math.sin(th);
-        const nx = a[0] * ox + b[0] * oy, ny = a[1] * ox + b[1] * oy, nz = a[2] * ox + b[2] * oy;
-        this.axis.set([dir[0] * h, dir[1] * h, dir[2] * h], i * 3);
-        this.radial.set([nx, ny, nz], i * 3);
+        this.along[i] = cfg.height * u;
+        this.cs[i * 2] = Math.cos(th);
+        this.cs[i * 2 + 1] = Math.sin(th);
         this.fullR[i] = r;
-        // flipped normals: pointing to the axis
-        src.nrm[i * 3] = -nx; src.nrm[i * 3 + 1] = -ny; src.nrm[i * 3 + 2] = -nz;
       }
     }
     fillLook(src, cfg, rng);
     this.source = src;
-    this.setRadius(1);
-    src.computeBounds(); // at full radius: valid for every smaller one too
+    this.place(1, { axisRot: null, tilt: 0, radiusScale: 1, lengthScale: 1 });
     src.alpha = 0;
   }
 
-  /** Radius scale s (1 = settings radius / topRadius). */
-  setRadius(s) {
-    const pos = this.source.pos;
-    const A = this.axis, D = this.radial, F = this.fullR;
+  /**
+   * Rebuild positions + (inward) normals. grow = pulse radius scale (1 = full);
+   * frame = { axisRot, tilt, radiusScale, lengthScale } (lean toward a far player).
+   */
+  place(grow, frame) {
+    const d = this.dir;
+    let u = d, a = this.a, b = this.b;
+    if (frame.axisRot) { u = rotate(d, frame.axisRot, frame.tilt); a = rotate(a, frame.axisRot, frame.tilt); b = rotate(b, frame.axisRot, frame.tilt); }
+    const L = frame.lengthScale, rs = frame.radiusScale * grow;
+    const ox = d[0] * this.base, oy = d[1] * this.base, oz = d[2] * this.base;
+    const src = this.source, P = src.pos, N = src.nrm;
+    const A = this.along, CS = this.cs, F = this.fullR;
     for (let i = 0; i < F.length; i++) {
-      const r = F[i] * s, i3 = i * 3;
-      pos[i3] = A[i3] + D[i3] * r;
-      pos[i3 + 1] = A[i3 + 1] + D[i3 + 1] * r;
-      pos[i3 + 2] = A[i3 + 2] + D[i3 + 2] * r;
+      const c = CS[i * 2], s = CS[i * 2 + 1], i3 = i * 3;
+      const nx = a[0] * c + b[0] * s, ny = a[1] * c + b[1] * s, nz = a[2] * c + b[2] * s;
+      const t = A[i] * L, r = F[i] * rs;
+      P[i3] = ox + u[0] * t + nx * r;
+      P[i3 + 1] = oy + u[1] * t + ny * r;
+      P[i3 + 2] = oz + u[2] * t + nz * r;
+      // flipped normals: pointing to the axis
+      N[i3] = -nx; N[i3 + 1] = -ny; N[i3 + 2] = -nz;
     }
+    // bounds of the whole (full radius) beam
+    const half = this.height * L * 0.5;
+    src.center = [ox + u[0] * half, oy + u[1] * half, oz + u[2] * half];
+    src.radius = Math.hypot(half, this.maxR * frame.radiusScale) + 0.5;
   }
-
 }
 
 export class LightCone {
