@@ -962,7 +962,7 @@ const settings = {
   calendar: {
     year: 2026,
     month: 12,                     // 1..12
-    selectableDays: [11, 12, 19],
+    selectableDays: [18, 19, 27],
     firstWeekday: 1,               // 0 = the week starts on Sunday, 1 = on Monday
     weekdayLetters: ['D', 'L', 'M', 'X', 'J', 'V', 'S'], // Sunday first (Date.getDay order)
     weekdayNames: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'],
